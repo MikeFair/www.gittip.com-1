@@ -75,6 +75,9 @@ local.env:
     echo "TWITTER_CONSUMER_KEY=QBB9vEhxO4DFiieRF68zTA" >> local.env
     echo "TWITTER_CONSUMER_SECRET=mUymh1hVMiQdMQbduQFYRi79EYYVeOZGrhj27H59H78" >> local.env
     echo "TWITTER_CALLBACK=http://127.0.0.1:8537/on/twitter/associate" >> local.env
+    echo "DEVNET_CONSUMER_KEY=QBB9vEhxO4DFiieRF68zTA" >> local.env
+    echo "DEVNET_CONSUMER_SECRET=mUymh1hVMiQdMQbduQFYRi79EYYVeOZGrhj27H59H78" >> local.env
+    echo "DEVNET_CALLBACK=http://127.0.0.1:8537/on/devnet/associate" >> local.env
 
 run: env local.env
     ./env/Scripts/swaddle local.env ./env/Scripts/aspen \
@@ -104,6 +107,9 @@ tests/env:
     echo "TWITTER_CONSUMER_KEY=QBB9vEhxO4DFiieRF68zTA" >> tests/env
     echo "TWITTER_CONSUMER_SECRET=mUymh1hVMiQdMQbduQFYRi79EYYVeOZGrhj27H59H78" >> tests/env
     echo "TWITTER_CALLBACK=http://127.0.0.1:8537/on/twitter/associate" >> tests/env
+    echo "DEVNET_CONSUMER_KEY=QBB9vEhxO4DFiieRF68zTA" >> tests/env
+    echo "DEVNET_CONSUMER_SECRET=mUymh1hVMiQdMQbduQFYRi79EYYVeOZGrhj27H59H78" >> tests/env
+    echo "DEVNET_CALLBACK=http://127.0.0.1:8537/on/devnet/associate" >> tests/env
 
 data: env
     ./makedb.sh gittip-test gittip-test
