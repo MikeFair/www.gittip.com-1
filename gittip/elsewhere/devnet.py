@@ -24,7 +24,7 @@ def oauth_url(website, action, then=""):
     Not sure why website is here. Vestige from GitHub forebear?
 
     """
-    return "/on/devnet/redirect?action=%s&then=%s" % (action, then)
+    return "/on/devnet/login.html?action=%s&then=%s" % (action, then)
 
 
 def get_user_info(screen_name):

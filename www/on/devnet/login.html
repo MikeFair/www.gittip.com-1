@@ -10,39 +10,15 @@ except ValueError:
 
 receivers = db.fetchall("""
 
-    SELECT p.id id
+    SELECT p.id id, e.participant_id is not null has_devnet, is_suspicious
       FROM participants p
-      JOIN elsewhere e ON p.id = e.participant_id
-     WHERE is_suspicious IS NOT true
+      LEFT OUTER JOIN elsewhere e ON p.id = e.participant_id and e.platform = 'devnet'
+     --WHERE is_suspicious IS NOT true
   LIMIT %s
   OFFSET %s
 
 """, (limit, offset))
 
-givers = db.fetchall("""
-
-    SELECT tipper, anonymous, sum(amount) AS amount
-      FROM (    SELECT DISTINCT ON (tipper, tippee)
-                       amount
-                     , tipper
-                  FROM tips
-                  JOIN participants p ON p.id = tipper
-                  JOIN participants p2 ON p2.id = tippee
-                  JOIN elsewhere ON elsewhere.participant_id = tippee
-                 WHERE p.last_bill_result = ''
-                   AND p.is_suspicious IS NOT true
-                   AND p2.claimed_time IS NOT NULL
-                   AND elsewhere.is_locked = false
-              ORDER BY tipper, tippee, mtime DESC
-              ) AS foo
-      JOIN participants p ON p.id = tipper
-     WHERE is_suspicious IS NOT true
-  GROUP BY tipper, anonymous
-  ORDER BY amount DESC
-  LIMIT %s
-  OFFSET %s
-
-""", (limit, offset))
 ^L
 {% extends templates/base.html %}
 
@@ -104,9 +80,7 @@ givers = db.fetchall("""
 {% end %}
 {% block body %}
 
-    <h2>Log In As:
-        <span class="small"><a href="/about/unclaimed.html">Unclaimed</a></span>
-    </h2>
+    <h2>Log In As:</h2>
 
     <div id="receivers">
 
@@ -116,15 +90,11 @@ givers = db.fetchall("""
             {% for i, participant in enumerate(receivers, start=1) %}
             <tr>
                 <td>{{ i }}.</td>
-                <td class="amount">$</td>
-                <td class="amount">{{ participant['id'] }}</td>
-                {% if participant['id'] %}
-                <td class="unclaimed">anonymous{% if user.ADMIN %}
-                    <a class="help" href="/{{ participant['id'] }}/">{{ participant['id'] }}</a>
-                {% end %}</td>
-                {% else %}
-                <td><a href="/{{ participant['id'] }}/">{{ participant['id'] }}</a></td>
-                {% end %}
+                <td class="amount">
+                <a href="/on/devnet/associate?action=opt-in&id={{ participant['id'] }}@DevNet&screen_name={{ participant['id'] }}">{{ participant['id'] }}</a>
+                <a href="/on/devnet/associate?action=connect&id={{ participant['id'] }}@DevNet&screen_name={{ participant['id'] }}">{{ participant['id'] }}</a>
+                </td>
+                <td>{{ participant['has_devnet'] }}</td>
             </tr>
             {% end %}
         </table>
