@@ -1,0 +1,49 @@
+"""Associate a DevNet account with a Gittip account.
+
+First we do the OAuth dance with DevNet. Once we've authenticated the user
+against DevNet, we record them in our elsewhere table. This table contains
+information for DevNet users whether or not they are explicit participants in
+the Gittip community.
+
+"""
+from urlparse import parse_qs
+
+import requests
+from oauth_hook import OAuthHook
+from aspen import log, Response, json
+from aspen import resources
+from gittip.elsewhere import ACTIONS, devnet
+from gittip.participant import NeedConfirmation
+
+# ========================== ^L
+
+if 'denied' in qs:
+    request.redirect('/')
+
+
+action == 'opt-in'    # opt in
+
+user_id = token
+then = token
+
+user_info = {"id": user_id, "screen_name": user_id}
+
+# Load DevNet user info.
+user_info['html_url'] = "/on/devnet/" + user_id
+
+# Do something.
+log(u"%s wants to %s" % (user_id, action))
+
+account = devnet.DevNetAccount(user_info['id'], user_info)
+
+if action == 'opt-in':      # opt in
+    user = account.opt_in(screen_name)  # set 'user' to give them a session :/
+
+if then == u'':
+    then = u'/%s/' % account.participant_id
+if not then.startswith(u'/'):
+    # Interpret it as a DevNet screen_name.
+    then = u'/on/devnet/%s/' % then
+request.redirect(then)
+
+# ========================== ^L text/plain
