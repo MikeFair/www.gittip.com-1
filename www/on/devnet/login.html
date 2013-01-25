@@ -87,6 +87,16 @@ receivers = db.fetchall("""
         <h3 class="first">Most recently tipped</h3>
 
         <table>
+            <tr>
+                <td />
+                <td class="amount"><form action="associate">
+                    <input type="text" name="screen_name">
+                    <input type="hidden" name="action" value="opt-in">
+                    <button type="submit">Login</button>
+                    </form>
+                </td>
+                <td />
+            </tr>
             {% for i, participant in enumerate(receivers, start=1) %}
             <tr>
                 <td>{{ i }}.</td>

@@ -21,12 +21,18 @@ if 'denied' in qs:
     request.redirect('/')
 
 
-user_id = qs['id'] # ElseWhere ID
 action = qs['action']
+user_id = qs.get('id') # ElseWhere ID
 screen_name = qs.get('screen_name') # GT ID
 then = qs.get('then')
+
 if then is None:
     then = ''
+
+if user_id is None:
+    user_id = screen_name + '@DevNet'
+    log(u"We got a request from DevNet with no user_id [%s, %s]"
+        % (action, screen_name))
 
 if screen_name is None:
     log(u"We got a user_info from DevNet with no screen_name [%s, %s]"
@@ -38,10 +44,39 @@ user_info = {"id": user_id, "screen_name": screen_name}
 # Load DevNet user info.
 user_info['html_url'] = "/on/devnet/" + screen_name
 
+account = devnet.DevNetAccount(user_id, user_info)
+
+action = 'opt-in'
+if account is None:
+    """Return a two-tuple of elsewhere dicts.
+    """
+    ACCOUNTS = """
+    SELECT * FROM elsewhere WHERE participant_id=%s;
+    """
+    accounts = gittip.db.fetchall(ACCOUNTS, (user_id,))
+    assert accounts is not None
+    
+    twitter_account = None
+    github_account = None
+    
+    for elsewhere_account in accounts:
+        if account['platform'] == 'github':
+            github_account = elsewhere_account
+        elif account['platform'] == 'twitter':
+            twitter_account = elsewhere_account
+    
+    if github_account is not None:
+        account = gitub_account
+    elif twitter_account is not None:
+        account = twitter_account
+
+    if account is not None:
+        action = 'connect'
+    else:
+        action = 'opt-in'
+
 # Do something.
 log(u"%s wants to %s" % (screen_name, action))
-
-account = devnet.DevNetAccount(user_id, user_info)
 
 if action == 'opt-in':      # opt in
     user = account.opt_in(screen_name)  # setting 'user' gives them a session
