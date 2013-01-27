@@ -8,12 +8,14 @@ try:
 except ValueError:
     raise Response(400)
 
-receivers = db.fetchall("""
+participants = db.fetchall("""
 
-    SELECT p.id id, e.participant_id is not null has_devnet, is_suspicious
+    SELECT p.id id, SUM(case e.platform when 'devnet' then 1 else 0 end) > 0 has_devnet, bool_or(is_suspicious) is_suspicious
       FROM participants p
-      LEFT OUTER JOIN elsewhere e ON p.id = e.participant_id and e.platform = 'devnet'
+      INNER JOIN elsewhere e ON p.id = e.participant_id
      --WHERE is_suspicious IS NOT true
+     GROUP BY p.id
+     ORDER BY p.id
   LIMIT %s
   OFFSET %s
 
@@ -80,35 +82,34 @@ receivers = db.fetchall("""
 {% end %}
 {% block body %}
 
+    <form id="jump" action="associate">
+        Create a new UserName: <br />
+        <span class="nowrap">
+            <input type="text" name="screen_name">
+            <button type="submit">Create Account</button>
+        </span>
+    </form>
+
     <h2>Log In As:</h2>
 
-    <div id="receivers">
-
-        <h3 class="first">Most recently tipped</h3>
-
+    <div id="givers">
         <table>
             <tr>
-                <td />
-                <td class="amount"><form action="associate">
-                    <input type="text" name="screen_name">
-                    <input type="hidden" name="action" value="opt-in">
-                    <button type="submit">Login</button>
-                    </form>
-                </td>
-                <td />
-            </tr>
-            {% for i, participant in enumerate(receivers, start=1) %}
-            <tr>
+            {% for i, participant in enumerate(participants, start=1) %}
                 <td>{{ i }}.</td>
-                <td class="amount">
-                <a href="/on/devnet/associate?action=opt-in&id={{ participant['id'] }}@DevNet&screen_name={{ participant['id'] }}">{{ participant['id'] }}</a>
-                <a href="/on/devnet/associate?action=connect&id={{ participant['id'] }}@DevNet&screen_name={{ participant['id'] }}">{{ participant['id'] }}</a>
+                <td class="first">
+                <a href="/on/devnet/associate?screen_name={{ participant['id'] }}">{{ participant['id'] }}</a>
                 </td>
                 <td>{{ participant['has_devnet'] }}</td>
-            </tr>
+                <td />
+                <td />
+                {% if i % 3 == 0 %}
+                    </tr><tr>
+                {% end %}
             {% end %}
+            </tr>
         </table>
-
     </div>
 
+    <h2 class="clear"></h2>
 {% end %}

@@ -12,79 +12,60 @@ import requests
 from oauth_hook import OAuthHook
 from aspen import log, Response, json
 from aspen import resources
-from gittip.elsewhere import ACTIONS, devnet
+from gittip.elsewhere import ACTIONS, devnet, github, twitter
 from gittip.participant import NeedConfirmation
 
+from gittip import participant
+from gittip.authentication import User
 # ========================== ^L
 
 if 'denied' in qs:
     request.redirect('/')
 
-
-action = qs['action']
-user_id = qs.get('id') # ElseWhere ID
-screen_name = qs.get('screen_name') # GT ID
-then = qs.get('then')
-
-if then is None:
-    then = ''
-
-if user_id is None:
-    user_id = screen_name + '@DevNet'
-    log(u"We got a request from DevNet with no user_id [%s, %s]"
-        % (action, screen_name))
+screen_name = qs.get('screen_name') # GitTip ID
 
 if screen_name is None:
-    log(u"We got a user_info from DevNet with no screen_name [%s, %s]"
-        % (action, then))
+    log(u"We got a user_info from DevNet with no screen_name [%s, %s]" % (action, then))
     raise Response(400)
 
-user_info = {"id": user_id, "screen_name": screen_name}
+then = screen_name
 
-# Load DevNet user info.
+account = participant.Participant(screen_name)
+log(u"Looked up participant: [%s]" % (account.get_details()))
+
+if account.get_details() is not None:
+    user = User.from_id(screen_name)  # give them a session
+    # look up the elsewhere accounts, specifically we're just looking to see if they already have a DevNet account
+    (github_account, twitter_account, devnet_account) = account.get_accounts_elsewhere()
+    #log(u"Looked up elsewhere:\nGitHub: %s\nTwitter: %s\nDevNet: %s" % (github_account, twitter_account, devnet_account))
+    if devnet_account is not None:
+        action = 'opt-in'
+    else:
+        action = 'connect'
+else:
+    action = 'opt-in'
+
+# Populate DevNet user info. These lines simulate the remote server populating its user_info response.
+user_id = screen_name + '@DevNet'
+user_info = {"id": user_id, "screen_name": screen_name}
 user_info['html_url'] = "/on/devnet/" + screen_name
 
-account = devnet.DevNetAccount(user_id, user_info)
+# This line then updates the database with the returned values for this DevNet entry
+# if they have an account this will be associated with their account
+# if they don't this will become the basis for their account
+account = devnet.DevNetAccount(user_info['id'], user_info)
 
-action = 'opt-in'
-if account is None:
-    """Return a two-tuple of elsewhere dicts.
-    """
-    ACCOUNTS = """
-    SELECT * FROM elsewhere WHERE participant_id=%s;
-    """
-    accounts = gittip.db.fetchall(ACCOUNTS, (user_id,))
-    assert accounts is not None
-    
-    twitter_account = None
-    github_account = None
-    
-    for elsewhere_account in accounts:
-        if account['platform'] == 'github':
-            github_account = elsewhere_account
-        elif account['platform'] == 'twitter':
-            twitter_account = elsewhere_account
-    
-    if github_account is not None:
-        account = gitub_account
-    elif twitter_account is not None:
-        account = twitter_account
-
-    if account is not None:
-        action = 'connect'
-    else:
-        action = 'opt-in'
 
 # Do something.
-log(u"%s wants to %s" % (screen_name, action))
+log(u"%s wants to %s using account %s" % (screen_name, action, account))
 
 if action == 'opt-in':      # opt in
     user = account.opt_in(screen_name)  # setting 'user' gives them a session
 elif action == 'connect':   # connect
-#    if user.ANON:
-#        raise Response(404)
+    if user.ANON:
+        raise Response(404)
     try:
-        user.take_over(account)
+        user.take_over(account, True)
     except NeedConfirmation, obstacles:
 
         # XXX Eep! Internal redirect! Really?!
