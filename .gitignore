@@ -9,3 +9,5 @@ tests/env
 nosetests.xml
 .coverage
 .noseids
+.deps
+redesign/css/.sass-cache/

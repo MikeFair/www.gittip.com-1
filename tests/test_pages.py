@@ -1,4 +1,7 @@
-from gittip.testing import serve_request, tip_graph, load
+from gittip.testing import (
+    serve_request, tip_graph, load, GITHUB_USER_UNREGISTERED_LGTEST)
+
+from mock import patch
 
 
 def test_homepage():
@@ -63,22 +66,11 @@ def test_about_unclaimed():
     actual = serve_request('/about/unclaimed.html').body
     assert expected in actual, actual
 
-def test_public_json_nothing():
-    with tip_graph(('alice', 'bob', 1)):
-        expected = '{"receiving": "0.00"}'
-        actual = serve_request('/alice/public.json').body
-        assert expected in actual, actual
 
-def test_public_json_something():
-    with tip_graph(('alice', 'bob', 1)):
-        expected = '{"receiving": "1.00"}'
-        actual = serve_request('/bob/public.json').body
-        assert expected in actual, actual
-
-
-# These hit the network. XXX add a knob to skip these
-
-def test_github_proxy():
+@patch('gittip.elsewhere.github.requests')
+def test_github_proxy(requests):
+    requests.get().status_code = 200
+    requests.get().text = GITHUB_USER_UNREGISTERED_LGTEST
     with load():
         expected = "<b>lgtest</b> has not joined"
         actual = serve_request('/on/github/lgtest/').body
@@ -90,6 +82,8 @@ def test_devnet_proxy():
         actual = serve_request('/on/devnet/devnet/').body
         assert expected in actual, actual
 
+
+# This hits the network. XXX add a knob to skip this
 def test_twitter_proxy():
     with load():
         expected = "<b>Twitter</b> has not joined"

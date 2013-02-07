@@ -399,17 +399,20 @@ Gittip.submitPaymentForm = function(e)
                         };
     credit_card.postal_code = val('zip');
 
-    var expiry = val('expiry').split('/');  // format enforced by mask
-    credit_card.expiration_month= expiry[0];
-    credit_card.expiration_year = expiry[1];
-
-
-    // Require some options (expiry is theoretically handled by the mask).
+    credit_card.expiration_month = val('expiration_month');
+    credit_card.expiration_year = val('expiration_year');
 
     if (!balanced.card.isCardNumberValid(credit_card.card_number))
     {
         $('BUTTON#save').text('Save');
         Gittip.showFeedback(null, ["Your card number is bad."]);
+    }
+    else if (!balanced.card.isExpiryValid( credit_card.expiration_month
+                                         , credit_card.expiration_year
+                                          ))
+    {
+        $('BUTTON#save').text('Save');
+        Gittip.showFeedback(null, ["Your expiration date is bad."]);
     }
     else if (!balanced.card.isSecurityCodeValid( credit_card.card_number
                                                , credit_card.security_code
@@ -505,7 +508,6 @@ Gittip.initPayment = function(balanced_uri, participantId)
     Gittip.participantId = participantId;
     $('#delete FORM').submit(Gittip.submitDeleteForm);
     $('FORM#payment').submit(Gittip.submitPaymentForm);
-    $('INPUT[id=expiry]').mask('99/2099');
 
     // Lazily depend on Balanced.
     var balanced_js = "https://js.balancedpayments.com/v1/balanced.js";
@@ -621,16 +623,17 @@ Gittip.initTipButtons = function()
             { url: '/' + tippee + '/tip.json'
             , data: {amount: amount}
             , type: "POST"
-            , success: function() {
-                $('.old-amount', container).remove();
-              }
             , error: function(x,y,z) {
                 select(cur);
                 alert("Sorry, something went wrong changing your tip. :(");
                 console.log(x,y,z);
               }
              }
-        );
+        )
+        .done(function(data) {
+                $('.old-amount', container).remove();
+                $('#total-giving').text("$" + data['total_giving']);
+              });
     });
 };
 

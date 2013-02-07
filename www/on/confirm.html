@@ -141,7 +141,7 @@ can_tip = False
                 <br />
                 {% if user_github_account is not None %}
                     <img src="/assets/icons/github.12.png" />
-                    {{ user_github_account['user_info']['login'] }}<br />
+                    {{ user_github_account.user_info['login'] }}<br />
                 {% end %}
                 {% if user_devnet_account is not None %}
                     <img src="/assets/icons/devnet.12.png" />
@@ -149,7 +149,7 @@ can_tip = False
                 {% end %}
                 {% if user_twitter_account is not None %}
                     <img src="/assets/icons/twitter.12.png" />
-                    {{ user_twitter_account['user_info']['screen_name'] }}<br />
+                    {{ user_twitter_account.user_info['screen_name'] }}<br />
                 {% end %}
             </div>
             </div>

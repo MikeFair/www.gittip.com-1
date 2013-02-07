@@ -1,6 +1,7 @@
 """GitHub user page on Gittip.
 """
 import decimal
+import os
 
 import requests
 from aspen import json, Response
@@ -44,7 +45,11 @@ if usertype == "user":
 
 elif usertype == "organization":
     members = []
-    resp = requests.get("https://api.github.com/orgs/%s/members" % username)
+    resp = requests.get(
+        "https://api.github.com/orgs/%s/members" % username,
+        params={'client_id': os.environ['GITHUB_CLIENT_ID'],
+                'client_secret': os.environ['GITHUB_CLIENT_SECRET']}
+    )
     if resp.status_code == 200:
         members = json.loads(resp.text)
 

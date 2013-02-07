@@ -12,6 +12,8 @@ tip_suggestions = ('jeresig', 'antirez', 'wycats', 'fabpot', 'mitsuhiko',
                    'jtauber', 'kennethreitz', 'alex', 'taylorotwell')
 tip_suggestions = [{'tippee': name, 'amount': 0} for name in tip_suggestions]
 
+MAKING = "I am making the world better by"
+
 def _extract_username(tip):
     if tip['platform'] == 'github':
         key = 'login'
@@ -21,6 +23,12 @@ def _extract_username(tip):
         assert tip['platform'] == 'twitter', tip  # sanity check
         key = 'screen_name'
     return tip['user_info'][key]
+
+def _clip(text, n):
+    text = text.replace('\n', ' ')
+    if len(text) > n:
+        text = text[:(n - 4)] + '...'
+    return text
 
 # ========================================================================== ^L
 
@@ -84,6 +92,14 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
 
 # ========================================================================== ^L
 {% extends templates/participant.html %}
+{% block head %}
+    <meta name="twitter:card" content="summary" />
+    <meta name="og:url" content="https://www.gittip.com/{{ username }}/" />
+    <meta name="og:type" content="website" />
+    <meta name="og:title" content="{{ participant.get_og_title() }}" />
+    <meta name="og:description" content="{{ _clip(MAKING + " " + participant.statement, 200) }}" />
+    <meta name="og:image" content="https://www.gittip.com/assets/gittip.opengraph.png" />
+{% end %}
 {% block their_voice %}
 
     <style>
@@ -177,6 +193,15 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
         #their-voice.is-suspicious {
             background: #FFE2DE;
         }
+        .editing #username_edit_warning {
+            margin-top: 1em;
+            display: block;
+            color: red;
+        }
+        #username_edit_warning {
+            display: none;
+        }
+
     </style>
     <script>
         $(document).ready(function()
@@ -458,8 +483,14 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
         <span class="participant_id"><form>
             <input name="participant_id" value="{{ escape(user.id) }}"/>
             <button id="save-participant_id" type="submit" class="selected small">Save</button>
-            <button id="cancel-participant_id" type="cancel" class="small">Cancel</button></form></span><button
-        id="edit-participant_id" class="small selected">Edit</button>.
+            <button id="cancel-participant_id" type="cancel" class="small">Cancel</button>
+        </form></span>
+        <button id="edit-participant_id" class="small selected">Edit</button>.
+
+        <span class='small' id='username_edit_warning'>Have you linked to your
+        Gittip profile from other websites?<br /><b>Be sure to update those
+        links!</b></span>
+
         <span class="small"><a href="/sign-out.html">Sign out</a></span>
     </h2>
 
@@ -469,7 +500,7 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
     <form class="statement"
         {% if participant.statement %}style="display: none;"{% end %}>
         <blockquote>
-            I am making the world better by ...
+            {{ MAKING }} ...
             <textarea>{{ participant.statement }}</textarea>
             <span class="help">Newlines and links are converted to HTML.</span>
             <button id="save-statement" type="submit" class="selected small">Save</button>
@@ -479,7 +510,7 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
 
     <blockquote id="my-statement" class="statement"
         {% if not participant.statement %}style="display: none"{% end %}>
-        I am making the world better by <span>
+            {{ MAKING }} <span>
             {{ wrap(participant.statement) }}</span><br />
         <button class="small selected">Edit</button>
     </blockquote>
@@ -540,7 +571,7 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
         <button class="small selected">Edit</button>
     </blockquote>
 
-    <h2>You give <span id="total">${{ total }}</span> per week.</h2>
+    <h2>You give <span id="total-giving">${{ total }}</span> per week.</h2>
 
     <p>
         <input name="anonymous" class="anonymous" type="checkbox"
@@ -694,16 +725,13 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
 
     <p>Use this code to add a Gittip &ldquo;receiving&rdquo; widget on your website:</p>
 
-    <pre>&lt;span class="gittip-0001" gittip-username="{{ participant.id }}"&gt;
-&lt/span&gt;
-&lt;script id="gittip-0001"
-  src="https://www.gittip.com/assets/widgets/0001.js"&gt;
+<pre>&lt;script data-gittip-username="{{ participant.id }}"
+src="https://www.gittip.com/assets/widgets/0002.js"&gt;
 &lt;/script&gt;</pre>
 
     <p>Here&rsquo;s what it looks like:</p>
 
-    <span class="gittip-0001" gittip-username="{{ participant.id }}"></span>
-    <script id="gittip-0001" src="/assets/widgets/0001.js"></script>
+    <script data-gittip-username="{{ participant.id }}" src="/assets/widgets/0002.js"></script>
 
 
     <h2>Connected Accounts</h2>
@@ -715,7 +743,7 @@ github_account, twitter_account, devnet_account = participant.get_accounts_elsew
         ${{ backed_amount }} per week.</h2>
 
     {% if participant.statement %}
-    <blockquote class="statement">I am making the world better by
+    <blockquote class="statement">{{ MAKING }}
     {{ wrap(participant.statement) }}</blockquote>
 
     <h3>Funding Goal</h3>

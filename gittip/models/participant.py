@@ -1,17 +1,21 @@
+from __future__ import unicode_literals
+
 import datetime
 from decimal import Decimal
 
 import pytz
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Column, CheckConstraint, UniqueConstraint
 from sqlalchemy.types import Text, TIMESTAMP, Boolean, Numeric
 
 import gittip
+from gittip.models.tip import Tip
 from gittip.orm import db
 # This is loaded for now to maintain functionality until the class is fully
 # migrated over to doing everything using SQLAlchemy
-from gittip.participant import Participant as ParticipantClass
+from gittip.participant import Participant as OldParticipant
 
 ASCII_ALLOWED_IN_PARTICIPANT_ID = set("0123456789"
                                       "abcdefghijklmnopqrstuvwxyz"
@@ -45,35 +49,61 @@ class Participant(db.Model):
     is_suspicious = Column(Boolean)
 
     ### Relations ###
-    accounts_elsewhere = relationship("Elsewhere", backref="participant",
-                                      lazy="dynamic")
+    accounts_elsewhere = relationship( "Elsewhere"
+                                     , backref="participant"
+                                     , lazy="dynamic"
+                                      )
     exchanges = relationship("Exchange", backref="participant")
+
     # TODO: Once tippee/tipper are renamed to tippee_id/tipper_idd, we can go
     # ahead and drop the foreign_keys & rename backrefs to tipper/tippee
-    _tipper_in = relationship("Tip", backref="tipper_participant",
-                             foreign_keys="Tip.tipper", lazy="dynamic")
-    _tippee_in = relationship("Tip", backref="tippee_participant",
-                             foreign_keys="Tip.tippee", lazy="dynamic")
-    transferer = relationship("Transfer", backref="transferer",
-                             foreign_keys="Transfer.tipper")
-    transferee = relationship("Transfer", backref="transferee",
-                             foreign_keys="Transfer.tippee")
+
+    _tips_giving = relationship( "Tip"
+                               , backref="tipper_participant"
+                               , foreign_keys="Tip.tipper"
+                               , lazy="dynamic"
+                                )
+    _tips_receiving = relationship( "Tip"
+                                  , backref="tippee_participant"
+                                  , foreign_keys="Tip.tippee"
+                                  , lazy="dynamic"
+                                   )
+
+    transferer = relationship( "Transfer"
+                             , backref="transferer"
+                             , foreign_keys="Transfer.tipper"
+                              )
+    transferee = relationship( "Transfer"
+                             , backref="transferee"
+                             , foreign_keys="Transfer.tippee"
+                              )
 
     # Class-specific exceptions
-    class IdTooLong(Exception): pass
-    class IdContainsInvalidCharacters(Exception): pass
-    class IdIsRestricted(Exception): pass
-    class IdAlreadyTaken(Exception): pass
+    class ProblemChangingId(Exception): pass
+    class IdTooLong(ProblemChangingId): pass
+    class IdContainsInvalidCharacters(ProblemChangingId): pass
+    class IdIsRestricted(ProblemChangingId): pass
+    class IdAlreadyTaken(ProblemChangingId): pass
+
+    class UnknownPlatform(Exception): pass
 
     @property
-    def tipper_in(self):
-        return self._tipper_in.distinct("tips.tippee")\
-                              .order_by("tips.tippee, tips.mtime DESC")
+    def tips_giving(self):
+        return self._tips_giving.distinct("tips.tippee")\
+                                .order_by("tips.tippee, tips.mtime DESC")
 
     @property
-    def tippee_in(self):
-        return self._tippee_in.distinct("tips.tipper")\
-                              .order_by("tips.tipper, tips.mtime DESC")
+    def tips_receiving(self):
+        return self._tips_receiving.distinct("tips.tipper")\
+                                   .order_by("tips.tipper, tips.mtime DESC")
+
+    @property
+    def valid_tips_receiving(self):
+        return self.tips_receiving \
+                   .join(Participant, Tip.tipper == Participant.id) \
+                   .filter( 'participants.is_suspicious IS NOT true'
+                          , Participant.last_bill_result == ''
+                           )
 
     def resolve_unclaimed(self):
         if self.accounts_elsewhere:
@@ -89,7 +119,7 @@ class Participant(db.Model):
         db.session.commit()
 
     def change_id(self, desired_id):
-        """Raise Response or return None.
+        """Raise self.ProblemChangingId, or return None.
 
         We want to be pretty loose with usernames. Unicode is allowed--XXX
         aspen bug :(. So are spaces. Control characters aren't. We also limit
@@ -131,42 +161,59 @@ class Participant(db.Model):
                 devnet_account = account
             elif account.platform == "twitter":
                 twitter_account = account
+            else:
+                raise self.UnknownPlatform(account.platform)
         return (github_account, twitter_account, devnet_account)
 
     def get_tip_to(self, tippee):
-        tip = self.tipper_in.filter_by(tippee=tippee).first()
+        tip = self.tips_giving.filter_by(tippee=tippee).first()
 
         if tip:
             amount = tip.amount
         else:
-            amount = Decimal('0.0')
+            amount = Decimal('0.00')
 
         return amount
 
-    def get_dollars_giving(self):
-        return sum(tip.amount for tip in self.tipper_in)
-
     def get_dollars_receiving(self):
-        return sum(tip.amount for tip in self.tippee_in)
+        return sum(tip.amount for tip in self.valid_tips_receiving) + Decimal('0.00')
 
     def get_number_of_backers(self):
-        nbackers = self.tippee_in\
-                       .distinct("tips.tipper")\
-                       .filter(Participant.last_bill_result == '',\
-                               "participants.is_suspicious IS NOT true")\
-                       .count()
+        amount_column = self.valid_tips_receiving.subquery().columns.amount
+        count = func.count(amount_column)
+        nbackers = db.session.query(count).filter(amount_column > 0).one()[0]
         return nbackers
 
+    def get_og_title(self):
+        out = self.id
+        receiving = self.get_dollars_receiving()
+        giving = self.get_dollars_giving()
+        if (giving > receiving) and not self.anonymous:
+            out += " gives $%.2f/wk" % giving
+        elif receiving > 0:
+            out += " receives $%.2f/wk" % receiving
+        else:
+            out += " is"
+        return out + " on Gittip"
+
+
+    # TODO: Move these queries into this class.
+
+    def set_tip_to(self, tippee_id, amount):
+        return OldParticipant(self.id).set_tip_to(tippee_id, amount)
+
+    def get_dollars_giving(self):
+        return OldParticipant(self.id).get_dollars_giving()
+
     def get_chart_of_receiving(self):
-        # TODO: Move the query in to this class.
-        return ParticipantClass(self.id).get_chart_of_receiving()
+        return OldParticipant(self.id).get_chart_of_receiving()
 
     def get_giving_for_profile(self, db=None):
-        return ParticipantClass(self.id).get_giving_for_profile(db)
+        return OldParticipant(self.id).get_giving_for_profile(db)
 
     def get_tips_and_total(self, for_payday=False, db=None):
-        return ParticipantClass(self.id).get_tips_and_total(for_payday, db)
+        return OldParticipant(self.id).get_tips_and_total(for_payday, db)
 
     def take_over(self, account_elsewhere, have_confirmation=False):
-        ParticipantClass(self.id).take_over(account_elsewhere,
+        OldParticipant(self.id).take_over(account_elsewhere,
                                             have_confirmation)

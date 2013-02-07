@@ -260,7 +260,8 @@ FORM.special .state         INPUT { width: 43px; }
 FORM.special .zip           INPUT { width: 75px; }
 FORM.special .card_number   INPUT { width: 137px; }
 FORM.special .cvv           INPUT { width: 43px; }
-FORM.special .expiry        INPUT { width: 75px; }
+FORM.special INPUT.expiration_month { width: 24px; }
+FORM.special INPUT.expiration_year  { width: 39px; margin-left: 1px ! important; }
 FORM.special .not-first LABEL,
 FORM.special .not-first INPUT {
     margin-left: 10px;
